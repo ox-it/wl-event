@@ -34,6 +34,10 @@ import java.util.Vector;
 
 import javax.servlet.http.HttpServletRequest;
 
+
+import net.sf.ehcache.Cache;
+import net.sf.ehcache.Element;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.sakaiproject.authz.api.AuthzGroupService;
@@ -75,6 +79,9 @@ public abstract class UsageSessionServiceAdaptor implements UsageSessionService
 	
 	/** How old a session has to be before being considered for deletion. Default 1 week. */
 	protected long keepSessionDuration = 1000*60*60*24*7;
+	
+	/** A Cache of recently refreshed users. This is to prevent frequent authentications refreshing user data */
+	protected Cache m_recentUserRefresh = null;
 
 	/*************************************************************************************************************************************************
 	 * Abstractions, etc.
@@ -158,6 +165,10 @@ public abstract class UsageSessionServiceAdaptor implements UsageSessionService
 
 	public void setKeepSessionDuration(long keepSessionDuration) {
 		this.keepSessionDuration = keepSessionDuration;
+	}
+
+	public void setRecentUserRefresh(Cache userRefresh) {
+		m_recentUserRefresh = userRefresh;
 	}
 
 	/** contains a map of the database dependent handlers. */
@@ -456,7 +467,8 @@ public abstract class UsageSessionServiceAdaptor implements UsageSessionService
 	public boolean login(Authentication authn, HttpServletRequest req)
 	{
 		// establish the user's session - this has been known to fail
-		UsageSession session = startSession(authn.getUid(), req.getRemoteAddr(), req.getHeader("user-agent"));
+		String uid = authn.getUid();
+		UsageSession session = startSession(uid, req.getRemoteAddr(), req.getHeader("user-agent"));
 		if (session == null)
 		{
 			return false;
@@ -464,11 +476,30 @@ public abstract class UsageSessionServiceAdaptor implements UsageSessionService
 
 		// set the user information into the current session
 		Session sakaiSession = sessionManager().getCurrentSession();
-		sakaiSession.setUserId(authn.getUid());
+		sakaiSession.setUserId(uid);
 		sakaiSession.setUserEid(authn.getEid());
 
 		// update the user's externally provided realm definitions
-		authzGroupService().refreshUser(authn.getUid());
+		if (m_recentUserRefresh != null && m_recentUserRefresh.isKeyInCache(uid))
+		{
+			if (M_log.isDebugEnabled())
+			{
+				M_log.debug("User is still in cache of recent refreshes: "+ uid);
+			}
+		}
+		else
+		{
+			authzGroupService().refreshUser(uid);
+			if (m_recentUserRefresh != null)
+			{
+				// Cache the refresh.
+				m_recentUserRefresh.put(new Element(uid, Boolean.TRUE));
+				if (M_log.isDebugEnabled())
+				{
+					M_log.debug("User is not in recent cache of refreshes: "+ uid);
+				}
+			}
+		}
 
 		// post the login event
 		eventTrackingService().post(eventTrackingService().newEvent(EVENT_LOGIN, null, true));

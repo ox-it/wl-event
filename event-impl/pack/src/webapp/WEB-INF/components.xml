@@ -98,6 +98,20 @@
               <entry key="oracle" ><ref bean="org.sakaiproject.event.impl.UsageSessionServiceSqlOracle" /></entry>
            </map>
         </property>
+        <property name="recentUserRefresh">
+            <ref bean="org.sakaiproject.event.api.UsageSessionService.recentUserRefresh"/>
+        </property>
 	</bean>
+	
+    <bean id="org.sakaiproject.event.api.UsageSessionService.recentUserRefresh"
+          class="org.springframework.cache.ehcache.EhCacheFactoryBean">
+       <property name="cacheManager">
+           <ref bean="org.sakaiproject.memory.api.MemoryService.cacheManager"/>
+       </property>
+       <property name="cacheName" value="RecentUserRefresh"/>
+       <property name="maxElementsInMemory" value="0"/>
+       <property name="timeToIdle" value="300"/>
+       <property name="timeToLive" value="300"/>
+    </bean>
 
 </beans>

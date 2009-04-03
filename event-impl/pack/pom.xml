@@ -25,6 +25,10 @@
       <artifactId>sakai-event-impl</artifactId>
       <version>${sakai.version}</version>
     </dependency>
+    <dependency>
+    	<groupId>net.sf.ehcache</groupId>
+    	<artifactId>ehcache</artifactId>
+    </dependency>
   </dependencies>
   <build>
     
