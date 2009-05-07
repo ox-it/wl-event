@@ -34,10 +34,6 @@ import java.util.Vector;
 
 import javax.servlet.http.HttpServletRequest;
 
-
-import net.sf.ehcache.Cache;
-import net.sf.ehcache.Element;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.sakaiproject.authz.api.AuthzGroupService;
@@ -50,6 +46,8 @@ import org.sakaiproject.event.api.SessionStateBindingListener;
 import org.sakaiproject.event.api.UsageSession;
 import org.sakaiproject.event.api.UsageSessionService;
 import org.sakaiproject.id.api.IdManager;
+import org.sakaiproject.memory.api.Cache;
+import org.sakaiproject.memory.api.MemoryService;
 import org.sakaiproject.thread_local.api.ThreadLocalManager;
 import org.sakaiproject.time.api.Time;
 import org.sakaiproject.time.api.TimeService;
@@ -144,6 +142,12 @@ public abstract class UsageSessionServiceAdaptor implements UsageSessionService
 	 * @return the UserDirectoryService collaborator.
 	 */
 	protected abstract UserDirectoryService userDirectoryService();
+	
+	/**
+	 * 
+	 * @return the MemoryService collaborator.
+	 */
+	protected abstract MemoryService memoryService();
 
 	/*************************************************************************************************************************************************
 	 * Configuration
@@ -214,6 +218,8 @@ public abstract class UsageSessionServiceAdaptor implements UsageSessionService
 			// open storage
 			m_storage.open();
 
+			m_recentUserRefresh = memoryService().newCache("org.sakaiproject.event.api.UsageSessionService.recentUserRefresh");
+			
 			M_log.info("init()");
 		}
 		catch (Throwable t)
@@ -480,7 +486,7 @@ public abstract class UsageSessionServiceAdaptor implements UsageSessionService
 		sakaiSession.setUserEid(authn.getEid());
 
 		// update the user's externally provided realm definitions
-		if (m_recentUserRefresh != null && m_recentUserRefresh.isKeyInCache(uid))
+		if (m_recentUserRefresh != null && m_recentUserRefresh.get(uid)!= null)
 		{
 			if (M_log.isDebugEnabled())
 			{
@@ -493,7 +499,7 @@ public abstract class UsageSessionServiceAdaptor implements UsageSessionService
 			if (m_recentUserRefresh != null)
 			{
 				// Cache the refresh.
-				m_recentUserRefresh.put(new Element(uid, Boolean.TRUE));
+				m_recentUserRefresh.put(uid, Boolean.TRUE);
 				if (M_log.isDebugEnabled())
 				{
 					M_log.debug("User is not in recent cache of refreshes: "+ uid);
