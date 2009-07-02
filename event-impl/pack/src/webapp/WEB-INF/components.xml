@@ -75,8 +75,7 @@
 
 	<bean id="org.sakaiproject.event.api.UsageSessionService"
 			class="org.sakaiproject.event.impl.UsageSessionServiceAdaptor"
-            init-method="init" destroy-method="destroy" singleton="true"
-            depends-on="org.sakaiproject.event.api.UsageSessionService.recentUserRefresh">
+            init-method="init" destroy-method="destroy" singleton="true">
 
         <lookup-method name="timeService"                bean="org.sakaiproject.time.api.TimeService"/>
         <lookup-method name="sqlService"                 bean="org.sakaiproject.db.api.SqlService"/>
@@ -87,7 +86,6 @@
         <lookup-method name="authzGroupService"          bean="org.sakaiproject.authz.api.AuthzGroupService"/>
         <lookup-method name="idManager"                  bean="org.sakaiproject.id.api.IdManager"/>
         <lookup-method name="userDirectoryService"       bean="org.sakaiproject.user.api.UserDirectoryService"/>
-        <lookup-method name="memoryService"              bean="org.sakaiproject.memory.api.MemoryService"/>
 
 		<property name="autoDdl"><value>${auto.ddl}</value></property>
         <property name="databaseBeans">
@@ -101,15 +99,5 @@
            </map>
         </property>
 	</bean>
-	
-    <bean id="org.sakaiproject.event.api.UsageSessionService.recentUserRefresh"
-          class="org.springframework.cache.ehcache.EhCacheFactoryBean">
-       <property name="cacheManager">
-           <ref bean="org.sakaiproject.memory.api.MemoryService.cacheManager"/>
-       </property>
-       <property name="cacheName" value="org.sakaiproject.event.api.UsageSessionService.recentUserRefresh"/>
-       <property name="timeToIdle" value="120"/>
-       <property name="timeToLive" value="120"/>
-    </bean>
 
 </beans>

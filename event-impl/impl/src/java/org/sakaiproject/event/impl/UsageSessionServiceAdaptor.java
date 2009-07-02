@@ -46,8 +46,6 @@ import org.sakaiproject.event.api.SessionStateBindingListener;
 import org.sakaiproject.event.api.UsageSession;
 import org.sakaiproject.event.api.UsageSessionService;
 import org.sakaiproject.id.api.IdManager;
-import org.sakaiproject.memory.api.Cache;
-import org.sakaiproject.memory.api.MemoryService;
 import org.sakaiproject.thread_local.api.ThreadLocalManager;
 import org.sakaiproject.time.api.Time;
 import org.sakaiproject.time.api.TimeService;
@@ -77,9 +75,6 @@ public abstract class UsageSessionServiceAdaptor implements UsageSessionService
 	
 	/** How old a session has to be before being considered for deletion. Default 1 week. */
 	protected long keepSessionDuration = 1000*60*60*24*7;
-	
-	/** A Cache of recently refreshed users. This is to prevent frequent authentications refreshing user data */
-	protected Cache m_recentUserRefresh = null;
 
 	/*************************************************************************************************************************************************
 	 * Abstractions, etc.
@@ -142,12 +137,6 @@ public abstract class UsageSessionServiceAdaptor implements UsageSessionService
 	 * @return the UserDirectoryService collaborator.
 	 */
 	protected abstract UserDirectoryService userDirectoryService();
-	
-	/**
-	 * 
-	 * @return the MemoryService collaborator.
-	 */
-	protected abstract MemoryService memoryService();
 
 	/*************************************************************************************************************************************************
 	 * Configuration
@@ -169,10 +158,6 @@ public abstract class UsageSessionServiceAdaptor implements UsageSessionService
 
 	public void setKeepSessionDuration(long keepSessionDuration) {
 		this.keepSessionDuration = keepSessionDuration;
-	}
-
-	public void setRecentUserRefresh(Cache userRefresh) {
-		m_recentUserRefresh = userRefresh;
 	}
 
 	/** contains a map of the database dependent handlers. */
@@ -218,8 +203,6 @@ public abstract class UsageSessionServiceAdaptor implements UsageSessionService
 			// open storage
 			m_storage.open();
 
-			m_recentUserRefresh = memoryService().newCache("org.sakaiproject.event.api.UsageSessionService.recentUserRefresh");
-			
 			M_log.info("init()");
 		}
 		catch (Throwable t)
@@ -473,8 +456,7 @@ public abstract class UsageSessionServiceAdaptor implements UsageSessionService
 	public boolean login(Authentication authn, HttpServletRequest req)
 	{
 		// establish the user's session - this has been known to fail
-		String uid = authn.getUid();
-		UsageSession session = startSession(uid, req.getRemoteAddr(), req.getHeader("user-agent"));
+		UsageSession session = startSession(authn.getUid(), req.getRemoteAddr(), req.getHeader("user-agent"));
 		if (session == null)
 		{
 			return false;
@@ -482,30 +464,11 @@ public abstract class UsageSessionServiceAdaptor implements UsageSessionService
 
 		// set the user information into the current session
 		Session sakaiSession = sessionManager().getCurrentSession();
-		sakaiSession.setUserId(uid);
+		sakaiSession.setUserId(authn.getUid());
 		sakaiSession.setUserEid(authn.getEid());
 
 		// update the user's externally provided realm definitions
-		if (m_recentUserRefresh != null && m_recentUserRefresh.get(uid)!= null)
-		{
-			if (M_log.isDebugEnabled())
-			{
-				M_log.debug("User is still in cache of recent refreshes: "+ uid);
-			}
-		}
-		else
-		{
-			authzGroupService().refreshUser(uid);
-			if (m_recentUserRefresh != null)
-			{
-				// Cache the refresh.
-				m_recentUserRefresh.put(uid, Boolean.TRUE);
-				if (M_log.isDebugEnabled())
-				{
-					M_log.debug("User is not in recent cache of refreshes: "+ uid);
-				}
-			}
-		}
+		authzGroupService().refreshUser(authn.getUid());
 
 		// post the login event
 		eventTrackingService().post(eventTrackingService().newEvent(EVENT_LOGIN, null, true));
